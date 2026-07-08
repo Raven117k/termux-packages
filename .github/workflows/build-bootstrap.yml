@@ -1,5 +1,8 @@
 name: Build Custom Termux Bootstrap
 on:
+  push:
+    branches:
+      - master
   workflow_dispatch:
     inputs:
       package_name:
@@ -37,7 +40,7 @@ jobs:
             ${{ runner.os }}-buildx-${{ matrix.arch }}-
       - name: Generate bootstrap for ${{ matrix.arch }}
         env:
-          TERMUX_APP_PACKAGE: ${{ github.event.inputs.package_name }}
+          TERMUX_APP_PACKAGE: ${{ github.event.inputs.package_name || 'com.aistudio.vscodeloader.hlab' }}
         shell: bash
         run: |
           set -euo pipefail
