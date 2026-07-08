@@ -40,6 +40,16 @@ jobs:
           TERMUX_APP_PACKAGE: ${{ github.event.inputs.package_name }}
         run: |
           echo "Building bootstrap for ${{ matrix.arch }} targeting package: $TERMUX_APP_PACKAGE"
+          
+          # 1. Override the core package name declaration inside properties.sh
+          if [ -f "./scripts/properties.sh" ]; then
+            sed -i 's|TERMUX_APP__PACKAGE_NAME="com.termux"|TERMUX_APP__PACKAGE_NAME="'"$TERMUX_APP_PACKAGE"'"|g' ./scripts/properties.sh
+          fi
+
+          # 2. Patch static text lookups in package compilation rules and templates recursively
+          find . -type f \( -name "*.sh" -o -name "*.subr" \) -exec sed -i "s|/data/data/com.termux|/data/data/$TERMUX_APP_PACKAGE|g" {} +
+
+          # 3. Fire up the generator script
           ./scripts/generate-bootstraps.sh --architectures ${{ matrix.arch }} 2>&1 | tee build-log-${{ matrix.arch }}.txt
       - name: Locate the built zip
         id: locate
