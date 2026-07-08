@@ -1,5 +1,4 @@
 name: Build Custom Termux Bootstrap
-
 on:
   workflow_dispatch:
     inputs:
@@ -7,7 +6,6 @@ on:
         description: 'Android package name'
         required: true
         default: 'com.aistudio.vscodeloader.hlab'
-
 jobs:
   build-bootstrap:
     runs-on: ubuntu-latest
@@ -19,7 +17,6 @@ jobs:
     steps:
       - name: Checkout termux-packages
         uses: actions/checkout@v4
-
       - name: Free up disk space
         run: |
           sudo rm -rf /usr/share/dotnet
@@ -29,10 +26,8 @@ jobs:
           sudo rm -rf /opt/hostedtoolcache/CodeQL
           sudo docker system prune -af
           df -h
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-
       - name: Cache Docker layers
         uses: actions/cache@v4
         with:
@@ -40,27 +35,34 @@ jobs:
           key: ${{ runner.os }}-buildx-${{ matrix.arch }}-${{ hashFiles('scripts/**') }}
           restore-keys: |
             ${{ runner.os }}-buildx-${{ matrix.arch }}-
-
       - name: Generate bootstrap for ${{ matrix.arch }}
         env:
           TERMUX_APP_PACKAGE: ${{ github.event.inputs.package_name }}
         run: |
           echo "Building bootstrap for ${{ matrix.arch }} targeting package: $TERMUX_APP_PACKAGE"
           ./scripts/generate-bootstraps.sh --architectures ${{ matrix.arch }} 2>&1 | tee build-log-${{ matrix.arch }}.txt
-
-      - name: Check output exists
+      - name: Locate the built zip
+        id: locate
         run: |
-          ls -la output/ || echo "No output directory found"
-          find . -name "bootstrap-${{ matrix.arch }}*.zip" || echo "No bootstrap zip found"
-
+          echo "Searching entire workspace for the bootstrap zip..."
+          FOUND=$(find "$GITHUB_WORKSPACE" -maxdepth 4 -iname "bootstrap-${{ matrix.arch }}*.zip" -print -quit)
+          if [ -z "$FOUND" ]; then
+            echo "No bootstrap zip found anywhere. Listing repo root for debugging:"
+            ls -la "$GITHUB_WORKSPACE"
+            echo "found=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Found zip at: $FOUND"
+            echo "zip_path=$FOUND" >> "$GITHUB_OUTPUT"
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          fi
       - name: Upload bootstrap artifact
-        if: success()
+        if: steps.locate.outputs.found == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: bootstrap-${{ matrix.arch }}
-          path: output/bootstrap-${{ matrix.arch }}.zip
+          path: ${{ steps.locate.outputs.zip_path }}
+          if-no-files-found: error
           retention-days: 14
-
       - name: Upload build logs (always, even on failure)
         if: always()
         uses: actions/upload-artifact@v4
@@ -68,13 +70,13 @@ jobs:
           name: build-log-${{ matrix.arch }}
           path: build-log-${{ matrix.arch }}.txt
           retention-days: 14
-
-      - name: Upload full output directory for debugging
-        if: failure()
+      - name: Upload full workspace for debugging
+        if: steps.locate.outputs.found != 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: debug-output-${{ matrix.arch }}
+          name: debug-workspace-${{ matrix.arch }}
           path: |
-            output/
-            !output/**/*.deb
+            ${{ github.workspace }}
+            !${{ github.workspace }}/**/*.deb
+            !${{ github.workspace }}/.git/**
           retention-days: 7
