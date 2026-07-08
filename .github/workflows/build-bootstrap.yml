@@ -54,8 +54,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          BOOTSTRAP_ZIP="$GITHUB_WORKSPACE/bootstrap-${{ matrix.arch }}.zip"
-          echo "Checking expected archive path: $BOOTSTRAP_ZIP"
+          BOOTSTRAP_ZIP="$PWD/bootstrap-${{ matrix.arch }}.zip"
+          echo "Checking archive path: $BOOTSTRAP_ZIP"
+          pwd
+          ls -la "$PWD"
           if [ -f "$BOOTSTRAP_ZIP" ]; then
             echo "Found zip at: $BOOTSTRAP_ZIP"
             ls -lh "$BOOTSTRAP_ZIP"
@@ -63,8 +65,8 @@ jobs:
             echo "zip_path=$BOOTSTRAP_ZIP" >> "$GITHUB_OUTPUT"
             echo "found=true" >> "$GITHUB_OUTPUT"
           else
-            echo "No bootstrap zip found at expected path. Listing workspace root for debugging:"
-            find "$GITHUB_WORKSPACE" -maxdepth 2 -type f | sed -n '1,200p'
+            echo "No bootstrap zip found at expected path. Listing workspace directory for debugging:"
+            find "$PWD" -maxdepth 2 -type f | sed -n '1,200p'
             echo "found=false" >> "$GITHUB_OUTPUT"
             exit 1
           fi
