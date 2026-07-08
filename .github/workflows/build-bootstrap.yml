@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       package_name:
-        description: 'Target Android package name'
+        description: 'Android package name'
         required: true
         default: 'com.aistudio.vscodeloader.hlab'
 
