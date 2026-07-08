@@ -1,0 +1,80 @@
+name: Build Custom Termux Bootstrap
+
+on:
+  workflow_dispatch:
+    inputs:
+      package_name:
+        description: 'Target Android package name'
+        required: true
+        default: 'com.aistudio.vscodeloader.hlab'
+
+jobs:
+  build-bootstrap:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [aarch64, x86_64]
+    steps:
+      - name: Checkout termux-packages
+        uses: actions/checkout@v4
+
+      - name: Free up disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /usr/local/share/boost
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          sudo docker system prune -af
+          df -h
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Cache Docker layers
+        uses: actions/cache@v4
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-${{ matrix.arch }}-${{ hashFiles('scripts/**') }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-${{ matrix.arch }}-
+
+      - name: Generate bootstrap for ${{ matrix.arch }}
+        env:
+          TERMUX_APP_PACKAGE: ${{ github.event.inputs.package_name }}
+        run: |
+          echo "Building bootstrap for ${{ matrix.arch }} targeting package: $TERMUX_APP_PACKAGE"
+          ./scripts/generate-bootstraps.sh --architectures ${{ matrix.arch }} 2>&1 | tee build-log-${{ matrix.arch }}.txt
+
+      - name: Check output exists
+        run: |
+          ls -la output/ || echo "No output directory found"
+          find . -name "bootstrap-${{ matrix.arch }}*.zip" || echo "No bootstrap zip found"
+
+      - name: Upload bootstrap artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bootstrap-${{ matrix.arch }}
+          path: output/bootstrap-${{ matrix.arch }}.zip
+          retention-days: 14
+
+      - name: Upload build logs (always, even on failure)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log-${{ matrix.arch }}
+          path: build-log-${{ matrix.arch }}.txt
+          retention-days: 14
+
+      - name: Upload full output directory for debugging
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-output-${{ matrix.arch }}
+          path: |
+            output/
+            !output/**/*.deb
+          retention-days: 7
