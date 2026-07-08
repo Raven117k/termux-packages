@@ -49,20 +49,23 @@ jobs:
           export TERMUX_APP_PACKAGE="$TERMUX_APP_PACKAGE"
           export TERMUX_REPO_APP__PACKAGE_NAME="$TERMUX_APP_PACKAGE"
           ./scripts/generate-bootstraps.sh --architectures "${{ matrix.arch }}" --package-name "$TERMUX_APP_PACKAGE" 2>&1 | tee "build-log-${{ matrix.arch }}.txt"
-      - name: Locate the built zip
+      - name: Prepare bootstrap artifact
         id: locate
         shell: bash
         run: |
           set -euo pipefail
           BOOTSTRAP_ZIP="$PWD/bootstrap-${{ matrix.arch }}.zip"
+          ARTIFACT_DIR="$PWD/artifacts"
+          mkdir -p "$ARTIFACT_DIR"
           echo "Checking archive path: $BOOTSTRAP_ZIP"
           pwd
           ls -la "$PWD"
           if [ -f "$BOOTSTRAP_ZIP" ]; then
-            echo "Found zip at: $BOOTSTRAP_ZIP"
-            ls -lh "$BOOTSTRAP_ZIP"
-            unzip -l "$BOOTSTRAP_ZIP" | sed -n '1,20p'
-            echo "zip_path=$BOOTSTRAP_ZIP" >> "$GITHUB_OUTPUT"
+            cp "$BOOTSTRAP_ZIP" "$ARTIFACT_DIR/bootstrap-${{ matrix.arch }}.zip"
+            echo "Prepared artifact directory: $ARTIFACT_DIR"
+            ls -lh "$ARTIFACT_DIR"
+            unzip -l "$ARTIFACT_DIR/bootstrap-${{ matrix.arch }}.zip" | sed -n '1,20p'
+            echo "zip_path=$ARTIFACT_DIR/bootstrap-${{ matrix.arch }}.zip" >> "$GITHUB_OUTPUT"
             echo "found=true" >> "$GITHUB_OUTPUT"
           else
             echo "No bootstrap zip found at expected path. Listing workspace directory for debugging:"
@@ -74,8 +77,8 @@ jobs:
         if: steps.locate.outputs.found == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: bootstrap-${{ github.event.inputs.package_name }}-${{ matrix.arch }}
-          path: ${{ steps.locate.outputs.zip_path }}
+          name: bootstrap-${{ github.event.inputs.package_name || 'com.aistudio.vscodeloader.hlab' }}-${{ matrix.arch }}
+          path: artifacts/
           if-no-files-found: error
           retention-days: 14
       - name: Upload build logs (always, even on failure)
