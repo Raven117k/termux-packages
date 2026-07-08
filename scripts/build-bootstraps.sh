@@ -14,6 +14,25 @@ set -e
 
 export TERMUX_SCRIPTDIR=$(realpath "$(dirname "$(realpath "$0")")/../")
 : "${TERMUX_TOPDIR:="$HOME/.termux-build"}"
+ORIGINAL_ARGS=("$@")
+CUSTOM_PACKAGE_NAME=""
+for ((i=0; i<${#ORIGINAL_ARGS[@]}; i++)); do
+	if [ "${ORIGINAL_ARGS[$i]}" = "--package-name" ]; then
+		next_index=$((i + 1))
+		if [ "$next_index" -lt "${#ORIGINAL_ARGS[@]}" ] && [ -n "${ORIGINAL_ARGS[$next_index]}" ] && [[ "${ORIGINAL_ARGS[$next_index]}" != -* ]]; then
+			CUSTOM_PACKAGE_NAME="${ORIGINAL_ARGS[$next_index]}"
+			break
+		fi
+		echo "[!] Option '--package-name' requires an argument." 1>&2
+		exit 1
+	fi
+done
+
+if [ -n "$CUSTOM_PACKAGE_NAME" ]; then
+	export TERMUX_APP__PACKAGE_NAME="$CUSTOM_PACKAGE_NAME"
+	export TERMUX_APP_PACKAGE="$CUSTOM_PACKAGE_NAME"
+fi
+
 . "${TERMUX_SCRIPTDIR}"/scripts/properties.sh
 . "${TERMUX_SCRIPTDIR}"/scripts/build/termux_step_handle_buildarch.sh
 
@@ -305,6 +324,9 @@ Available command_options:
                      Override default list of architectures for which bootstrap
                      archives will be created. Multiple architectures should be
                      passed as comma-separated list.
+  [ --package-name <name> ]
+                     Override the Android app package name used for bootstrap
+                     paths and data directories.
 
 
 The package name/prefix that the bootstrap is built for is defined by
@@ -366,6 +388,18 @@ main() {
 					shift 1
 				else
 					echo "[!] Option '--architectures' requires an argument." 1>&2
+					show_usage
+					return 1
+				fi
+				;;
+			--package-name)
+				if [ $# -gt 1 ] && [ -n "$2" ] && [[ $2 != -* ]]; then
+					TERMUX_APP__PACKAGE_NAME="$2"
+					TERMUX_APP_PACKAGE="$2"
+					export TERMUX_APP__PACKAGE_NAME TERMUX_APP_PACKAGE
+					shift 1
+				else
+					echo "[!] Option '--package-name' requires an argument." 1>&2
 					show_usage
 					return 1
 				fi

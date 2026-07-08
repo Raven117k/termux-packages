@@ -6,9 +6,29 @@
 set -e
 
 export TERMUX_SCRIPTDIR=$(realpath "$(dirname "$(realpath "$0")")/../")
-. $(dirname "$(realpath "$0")")/properties.sh
 BOOTSTRAP_TMPDIR=$(mktemp -d "${TMPDIR:-/tmp}/bootstrap-tmp.XXXXXXXX")
 trap 'rm -rf $BOOTSTRAP_TMPDIR' EXIT
+
+ORIGINAL_ARGS=("$@")
+CUSTOM_PACKAGE_NAME=""
+for ((i=0; i<${#ORIGINAL_ARGS[@]}; i++)); do
+	if [ "${ORIGINAL_ARGS[$i]}" = "--package-name" ]; then
+		next_index=$((i + 1))
+		if [ "$next_index" -lt "${#ORIGINAL_ARGS[@]}" ] && [ -n "${ORIGINAL_ARGS[$next_index]}" ] && [[ "${ORIGINAL_ARGS[$next_index]}" != -* ]]; then
+			CUSTOM_PACKAGE_NAME="${ORIGINAL_ARGS[$next_index]}"
+			break
+		fi
+		echo "[!] Option '--package-name' requires an argument." 1>&2
+		exit 1
+	fi
+done
+
+if [ -n "$CUSTOM_PACKAGE_NAME" ]; then
+	export TERMUX_APP__PACKAGE_NAME="$CUSTOM_PACKAGE_NAME"
+	export TERMUX_APP_PACKAGE="$CUSTOM_PACKAGE_NAME"
+fi
+
+. $(dirname "$(realpath "$0")")/properties.sh
 
 # By default, bootstrap archives are compatible with Android >=7.0
 # and <10.
@@ -361,6 +381,18 @@ while (($# > 0)); do
 				shift 1
 			else
 				echo "[!] Option '--pm' requires an argument." 1>&2
+				show_usage
+				exit 1
+			fi
+			;;
+		--package-name)
+			if [ $# -gt 1 ] && [ -n "$2" ] && [[ $2 != -* ]]; then
+				TERMUX_APP__PACKAGE_NAME="$2"
+				TERMUX_APP_PACKAGE="$2"
+				export TERMUX_APP__PACKAGE_NAME TERMUX_APP_PACKAGE
+				shift 1
+			else
+				echo "[!] Option '--package-name' requires an argument." 1>&2
 				show_usage
 				exit 1
 			fi
