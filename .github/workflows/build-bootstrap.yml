@@ -53,17 +53,20 @@ jobs:
         id: locate
         shell: bash
         run: |
-          echo "Searching entire workspace for the bootstrap zip..."
-          FOUND=$(find "$GITHUB_WORKSPACE" -type f -iname "bootstrap-${{ matrix.arch }}*.zip" -print -quit)
-          if [ -z "$FOUND" ]; then
-            echo "No bootstrap zip found anywhere. Listing workspace root for debugging:"
+          set -euo pipefail
+          BOOTSTRAP_ZIP="$GITHUB_WORKSPACE/bootstrap-${{ matrix.arch }}.zip"
+          echo "Checking expected archive path: $BOOTSTRAP_ZIP"
+          if [ -f "$BOOTSTRAP_ZIP" ]; then
+            echo "Found zip at: $BOOTSTRAP_ZIP"
+            ls -lh "$BOOTSTRAP_ZIP"
+            unzip -l "$BOOTSTRAP_ZIP" | sed -n '1,20p'
+            echo "zip_path=$BOOTSTRAP_ZIP" >> "$GITHUB_OUTPUT"
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No bootstrap zip found at expected path. Listing workspace root for debugging:"
             find "$GITHUB_WORKSPACE" -maxdepth 2 -type f | sed -n '1,200p'
             echo "found=false" >> "$GITHUB_OUTPUT"
             exit 1
-          else
-            echo "Found zip at: $FOUND"
-            echo "zip_path=$FOUND" >> "$GITHUB_OUTPUT"
-            echo "found=true" >> "$GITHUB_OUTPUT"
           fi
       - name: Upload bootstrap artifact
         if: steps.locate.outputs.found == 'true'
